@@ -39,9 +39,9 @@ app = FastAPI(
 app.include_router(health.router)
 app.include_router(gateway.router)
 
-_test_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "test")
-if os.path.isdir(_test_dir):
-    app.mount("/test", StaticFiles(directory=_test_dir, html=True), name="test")
+_tests_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "tests")
+if os.path.isdir(_tests_dir):
+    app.mount("/tests", StaticFiles(directory=_tests_dir, html=True), name="tests")
 
 
 if __name__ == "__main__":
