@@ -7,7 +7,7 @@
 | 環境変数 | デフォルト値 | 用途 |
 | --- | --- | --- |
 | `GEMINI_API_KEY` | `""` | Gemini API キー |
-| `GEMINI_MODEL` | `gemini-2.0-flash` | 利用モデル名 |
+| `GEMINI_MODEL` | `gemini-2.5-flash` | 利用モデル名 |
 | `GEMINI_API_TIMEOUT` | `60` | 将来的な API タイムアウト設定用 |
 | `REDIS_HOST` | `localhost` | Redis ホスト |
 | `REDIS_PORT` | `6379` | Redis ポート |
@@ -48,6 +48,7 @@
 | --- | --- |
 | `tests/test_api.py` | ヘルスチェックと `/gateway/generate` の主要分岐 |
 | `tests/test_pii_detector.py` | PII 検知、マスク、アンマスク、ストリーミング用アンマスク |
+| `tests/test_pii_detector_identifiers.py` | マイナンバー・運転免許証・パスポート・銀行口座などの識別子系検知 |
 
 ### テストの特徴
 
@@ -79,7 +80,9 @@ spaCy の大きいモデルをロードするため、コンテナやサーバ�
 ## 拡張ポイント
 
 - 新しい PII 種別を対象にしたい場合
-  `PiiDetector.TARGET_ENTITIES` と `ENTITY_PREFIX_MAP` を更新する
+  `PiiDetector.TARGET_ENTITIES` と `ENTITY_PREFIX_MAP` を更新し、必要に応じて以下のいずれかで検知ロジックを追加する
+  - パターンベース: `PatternRecognizer` を `__init__` で `ja` / `en` 両方に登録
+  - 文脈ベース: `CONTEXTUAL_REGEXES` にキーワード + 値のキャプチャを追加
 - 永続化や監査を強めたい場合
   `MappingStore` の保持期間や削除タイミングを見直す
 - 別 LLM に切り替えたい場合

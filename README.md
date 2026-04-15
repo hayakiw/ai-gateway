@@ -51,7 +51,7 @@ ai-gateway/
 | Web フレームワーク | FastAPI |
 | PII 検出 | Microsoft Presidio |
 | NLP エンジン | spaCy（ja_core_news_lg / en_core_web_lg） |
-| LLM | Google Gemini（gemini-2.0-flash） |
+| LLM | Google Gemini（gemini-2.5-flash） |
 | マッピング保存 | Redis |
 | API クライアント | google-genai |
 
@@ -59,13 +59,19 @@ ai-gateway/
 
 | エンティティ | プレースホルダー例 | 説明 |
 |-------------|------------------|------|
-| PERSON | `[PERSON_1]` | 人名 |
+| PERSON | `[PERSON_1]` | 人名（敬称「さん/様/氏/君/くん/ちゃん/先生/殿」を文脈として活用） |
 | EMAIL_ADDRESS | `[EMAIL_1]` | メールアドレス |
 | PHONE_NUMBER | `[PHONE_1]` | 電話番号 |
-| CREDIT_CARD | `[CREDIT_CARD_1]` | クレジットカード番号 |
+| CREDIT_CARD | `[CREDIT_CARD_1]` | クレジットカード番号（13〜19桁） |
 | IP_ADDRESS | `[IP_1]` | IP アドレス |
-| LOCATION | `[LOCATION_1]` | 地名・住所 |
+| LOCATION | `[LOCATION_1]` | 地名・住所（都道府県〜番地まで） |
 | URL | `[URL_1]` | URL |
+| MY_NUMBER | `[MY_NUMBER_1]` | マイナンバー（個人番号） |
+| DRIVER_LICENSE | `[DRIVER_LICENSE_1]` | 運転免許証番号 |
+| PASSPORT_NUMBER | `[PASSPORT_1]` | パスポート番号 |
+| BANK_ACCOUNT | `[BANK_ACCOUNT_1]` | 銀行口座番号 |
+
+> **注意**: 上記は現時点の検出対象です。業務・利用シーンによって機微情報の範囲は異なるため、運用状況やリスク評価に応じて対象エンティティや検出パターンを随時追加・調整してください。追加する場合は [app/services/pii_detector.py](app/services/pii_detector.py) の `TARGET_ENTITIES` および対応する `PatternRecognizer` / `CONTEXTUAL_REGEXES` を更新します。
 
 ## セットアップ
 
@@ -100,7 +106,7 @@ cp .env.example .env
 ```dotenv
 # Gemini API settings
 GEMINI_API_KEY=your-api-key-here
-GEMINI_MODEL=gemini-2.0-flash
+GEMINI_MODEL=gemini-2.5-flash
 GEMINI_API_TIMEOUT=60
 
 # Redis settings
@@ -217,7 +223,7 @@ pytest tests/ -v
 | 環境変数 | デフォルト値 | 説明 |
 |---------|------------|------|
 | `GEMINI_API_KEY` | (空文字) | Gemini API キー |
-| `GEMINI_MODEL` | `gemini-2.0-flash` | 使用する Gemini モデル |
+| `GEMINI_MODEL` | `gemini-2.5-flash` | 使用する Gemini モデル |
 | `GEMINI_API_TIMEOUT` | `60` | API タイムアウト（秒） |
 | `REDIS_HOST` | `localhost` | Redis ホスト |
 | `REDIS_PORT` | `6379` | Redis ポート |

@@ -37,6 +37,10 @@ class PiiDetector:
         "MEDICAL_LICENSE": "MEDICAL_LICENSE",
         "URL": "URL",
         "IBAN_CODE": "IBAN",
+        "MY_NUMBER": "MY_NUMBER",
+        "DRIVER_LICENSE": "DRIVER_LICENSE",
+        "PASSPORT_NUMBER": "PASSPORT",
+        "BANK_ACCOUNT": "BANK_ACCOUNT",
     }
 
     # Entities to detect
@@ -48,7 +52,54 @@ class PiiDetector:
         "IP_ADDRESS",
         "LOCATION",
         "URL",
+        "MY_NUMBER",
+        "DRIVER_LICENSE",
+        "PASSPORT_NUMBER",
+        "BANK_ACCOUNT",
     ]
+
+    CONTEXTUAL_REGEXES: dict[str, list[re.Pattern[str]]] = {
+        "MY_NUMBER": [
+            re.compile(
+                r"(?:\bmy number\b|\bindividual number\b|"
+                r"\u30de\u30a4\u30ca\u30f3\u30d0\u30fc|\u500b\u4eba\u756a\u53f7)"
+                r"\s*[:\uff1a#-]?\s*(?P<value>\d{4}[ -]?\d{4}[ -]?\d{4})",
+                re.IGNORECASE,
+            ),
+        ],
+        "DRIVER_LICENSE": [
+            re.compile(
+                r"(?:\bdriver'?s? license(?: number)?\b|"
+                r"\bdriving license(?: number)?\b|"
+                r"\u904b\u8ee2\u514d\u8a31(?:\u8a3c)?\u756a\u53f7|"
+                r"\u514d\u8a31\u8a3c\u756a\u53f7)"
+                r"\s*[:\uff1a#-]?\s*(?P<value>\d{12})",
+                re.IGNORECASE,
+            ),
+        ],
+        "PASSPORT_NUMBER": [
+            re.compile(
+                r"(?:\bpassport(?: number)?\b|"
+                r"\btravel document(?: number)?\b|"
+                r"\u30d1\u30b9\u30dd\u30fc\u30c8(?:\u756a\u53f7)?|"
+                r"\u65c5\u5238\u756a\u53f7)"
+                r"\s*[:\uff1a#-]?\s*(?P<value>[A-Z]{1,2}\d{6,8})",
+                re.IGNORECASE,
+            ),
+        ],
+        "BANK_ACCOUNT": [
+            re.compile(
+                r"(?:\bbank account(?: number)?\b|"
+                r"\baccount number\b|"
+                r"\u9280\u884c\u53e3\u5ea7(?:\u756a\u53f7)?|"
+                r"\u53e3\u5ea7\u756a\u53f7|"
+                r"\u666e\u901a\u9810\u91d1\u53e3\u5ea7(?:\u756a\u53f7)?|"
+                r"\u5f53\u5ea7\u9810\u91d1\u53e3\u5ea7(?:\u756a\u53f7)?)"
+                r"\s*[:\uff1a#-]?\s*(?P<value>\d{6,8})",
+                re.IGNORECASE,
+            ),
+        ],
+    }
 
     def __init__(self, languages: list[str] | None = None):
         self._languages = languages or ["ja", "en"]
@@ -74,12 +125,64 @@ class PiiDetector:
             regex=r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}",
             score=1.0,
         )
+        # Credit card: 13-19 digits, optionally separated by spaces or hyphens.
+        # Presidio's built-in CreditCardRecognizer is en-only; register for ja too.
+        credit_card_pattern = Pattern(
+            name="credit_card_digits",
+            regex=r"(?<!\d)(?:\d[ \-]?){13,19}(?!\d)",
+            score=0.9,
+        )
+        # Japanese person name by honorific suffix (さん/様/氏/君/殿/先生 etc.)
+        # spaCy NER often misses bare surnames like "鈴木" without context.
+        jp_person_pattern = Pattern(
+            name="jp_person_honorific",
+            regex=r"[一-龥ァ-ヶー]{1,8}(?=さん|サン|様|さま|氏|君|くん|ちゃん|先生|殿)",
+            score=0.85,
+        )
+        # Japanese address: 都道府県 + (郡)? + 市区町村 + 番地まで
+        jp_address_pattern = Pattern(
+            name="jp_address_full",
+            regex=(
+                r"(?:北海道|(?:京都|大阪)府|(?:東京)都|"
+                r"[一-龥]{2,3}県)"
+                r"(?:[一-龥]{1,8}郡)?"
+                r"[一-龥ぁ-んァ-ヶa-zA-Z0-9]{1,15}?"
+                r"(?:市|区|町|村)"
+                r"[一-龥ぁ-んァ-ヶ]*"
+                r"[0-9０-９\-ー―‐－]*"
+            ),
+            score=0.85,
+        )
         for lang in self._languages:
             self._analyzer.registry.add_recognizer(
                 PatternRecognizer(
                     supported_entity="EMAIL_ADDRESS",
                     name=f"StrongEmailRecognizer_{lang}",
                     patterns=[email_pattern],
+                    supported_language=lang,
+                )
+            )
+            self._analyzer.registry.add_recognizer(
+                PatternRecognizer(
+                    supported_entity="CREDIT_CARD",
+                    name=f"CreditCardRecognizer_{lang}",
+                    patterns=[credit_card_pattern],
+                    supported_language=lang,
+                )
+            )
+            self._analyzer.registry.add_recognizer(
+                PatternRecognizer(
+                    supported_entity="LOCATION",
+                    name=f"JpAddressRecognizer_{lang}",
+                    patterns=[jp_address_pattern],
+                    supported_language=lang,
+                )
+            )
+            self._analyzer.registry.add_recognizer(
+                PatternRecognizer(
+                    supported_entity="PERSON",
+                    name=f"JpPersonHonorificRecognizer_{lang}",
+                    patterns=[jp_person_pattern],
                     supported_language=lang,
                 )
             )
@@ -98,6 +201,9 @@ class PiiDetector:
         counters[prefix] = count
         return f"[{prefix}_{count}]"
 
+    # Chars that make an entity match look "name-like": letters or CJK.
+    _NAMELIKE_RE = re.compile(r"[A-Za-z\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]")
+
     def detect(
         self, text: str, language: str = "ja"
     ) -> list[RecognizerResult]:
@@ -107,6 +213,39 @@ class PiiDetector:
             entities=self.TARGET_ENTITIES,
             language=language,
         )
+        results.extend(self._detect_contextual_identifiers(text))
+        # Drop PERSON/LOCATION matches that contain no letter/CJK character
+        # (e.g., spaCy NER mislabeling "#" or other symbols as PERSON).
+        filtered: list[RecognizerResult] = []
+        for r in results:
+            span = text[r.start:r.end]
+            if r.entity_type in ("PERSON", "LOCATION") and not self._NAMELIKE_RE.search(span):
+                continue
+            filtered.append(r)
+        return filtered
+
+    @classmethod
+    def _detect_contextual_identifiers(
+        cls, text: str
+    ) -> list[RecognizerResult]:
+        """Detect Japan-specific identifiers when explicit surrounding context exists."""
+        results: list[RecognizerResult] = []
+        for entity_type, patterns in cls.CONTEXTUAL_REGEXES.items():
+            for pattern in patterns:
+                for match in pattern.finditer(text):
+                    value = match.group("value")
+                    if not value:
+                        continue
+                    start = match.start("value")
+                    end = match.end("value")
+                    results.append(
+                        RecognizerResult(
+                            entity_type=entity_type,
+                            start=start,
+                            end=end,
+                            score=0.95,
+                        )
+                    )
         return results
 
     def mask(self, text: str, language: str = "ja") -> MaskingResult:

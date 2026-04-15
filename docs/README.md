@@ -1,6 +1,6 @@
 # ai-gateway ドキュメント
 
-このディレクトリは `ai-gateway` の実装を理解しやすくするための開発資料です。セットアップ手順の詳細は [../README.md](/c:/Users/hayak/work/dojo/ai-cube-llm/ai-gateway/README.md) に譲り、この資料では「プログラムがどう動くか」を中心に整理しています。
+このディレクトリは `ai-gateway` の実装を理解しやすくするための開発資料です。セットアップ手順の詳細は [../README.md](../README.md) に譲り、この資料では「プログラムがどう動くか」を中心に整理しています。
 
 ## 目次
 

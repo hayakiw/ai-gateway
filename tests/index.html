@@ -75,7 +75,16 @@
     <label><input type="checkbox" id="stream" /> stream (SSE)</label>
   </div>
 
-  <textarea id="prompt" placeholder="例: 田中さんのメールは test@example.com です"></textarea>
+  <textarea id="prompt" placeholder="例: 田中さんのメールは test@example.com です" rows="12"># 以下の情報を参考にしてください
+田中太郎さんの情報
+ - メールアドレス1: test1@example.com
+ - メールアドレス2: test2@example.com
+ - 住所:鳥取県西伯郡南部町123
+ - 電話番号:08012345678
+ - クレジットカード番号:4242424242424242
+
+# 以下の質問に回答してください
+田中太郎さんのメールアドレス、電話番号、クレジット番号を教えて</textarea>
 
   <div class="row">
     <button id="send">送信</button>
