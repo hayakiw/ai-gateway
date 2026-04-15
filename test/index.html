@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<title>AI Gateway Test</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    max-width: 960px;
+    margin: 20px auto;
+    padding: 0 16px;
+    color: #222;
+  }
+  h1 { font-size: 20px; margin-bottom: 8px; }
+  .row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+  label { font-size: 13px; color: #555; }
+  textarea {
+    width: 100%;
+    min-height: 100px;
+    font-size: 14px;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-family: inherit;
+  }
+  select, input[type=text] {
+    padding: 6px 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 14px;
+  }
+  button {
+    padding: 8px 16px;
+    font-size: 14px;
+    background: #2563eb;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  button:disabled { background: #9ca3af; cursor: not-allowed; }
+  button.secondary { background: #6b7280; }
+  .section {
+    margin-top: 16px;
+    padding: 12px;
+    background: #f8f9fb;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+  }
+  .section h3 { margin: 0 0 8px; font-size: 13px; color: #374151; }
+  pre {
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: Consolas, Menlo, monospace;
+    font-size: 13px;
+  }
+  .response { min-height: 80px; }
+  .status { font-size: 12px; color: #6b7280; }
+  .err { color: #dc2626; }
+</style>
+</head>
+<body>
+  <h1>AI Gateway - Test Console</h1>
+  <div class="status" id="status">checking health…</div>
+
+  <div class="row" style="margin-top: 12px;">
+    <label>Language:</label>
+    <select id="language">
+      <option value="ja" selected>ja</option>
+      <option value="en">en</option>
+    </select>
+    <label><input type="checkbox" id="unmask" checked /> unmask_response</label>
+    <label><input type="checkbox" id="stream" /> stream (SSE)</label>
+  </div>
+
+  <textarea id="prompt" placeholder="例: 田中さんのメールは test@example.com です"></textarea>
+
+  <div class="row">
+    <button id="send">送信</button>
+    <button id="clear" class="secondary">クリア</button>
+  </div>
+
+  <div class="section">
+    <h3>Response</h3>
+    <pre id="response" class="response"></pre>
+  </div>
+  <div class="section">
+    <h3>Masked prompt</h3>
+    <pre id="masked"></pre>
+  </div>
+  <div class="section">
+    <h3>PII detected (placeholder → original)</h3>
+    <pre id="pii"></pre>
+  </div>
+  <div class="section">
+    <h3>Raw JSON</h3>
+    <pre id="raw"></pre>
+  </div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+
+async function checkHealth() {
+  try {
+    const r = await fetch("/health");
+    const j = await r.json();
+    $("status").textContent = `health: ${j.status} / redis: ${j.redis}`;
+  } catch (e) {
+    $("status").textContent = "health check failed: " + e.message;
+    $("status").classList.add("err");
+  }
+}
+
+function reset() {
+  $("response").textContent = "";
+  $("masked").textContent = "";
+  $("pii").textContent = "";
+  $("raw").textContent = "";
+}
+
+async function sendNonStream(body) {
+  const res = await fetch("/gateway/generate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const json = await res.json();
+  if (!res.ok) {
+    $("response").textContent = "Error: " + (json.detail || res.statusText);
+    $("response").classList.add("err");
+    $("raw").textContent = JSON.stringify(json, null, 2);
+    return;
+  }
+  $("response").textContent = json.llm_response || "";
+  $("masked").textContent = json.masked_prompt || "";
+  $("pii").textContent = JSON.stringify(json.pii_detected || {}, null, 2);
+  $("raw").textContent = JSON.stringify(json, null, 2);
+}
+
+async function sendStream(body) {
+  const res = await fetch("/gateway/stream", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok || !res.body) {
+    $("response").textContent = "Stream error: " + res.statusText;
+    $("response").classList.add("err");
+    return;
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  $("response").textContent = "";
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    const parts = buf.split("\n\n");
+    buf = parts.pop();
+    for (const part of parts) {
+      const lines = part.split("\n");
+      let event = "message", data = "";
+      for (const line of lines) {
+        if (line.startsWith("event:")) event = line.slice(6).trim();
+        else if (line.startsWith("data:")) data += line.slice(5).trim();
+      }
+      if (!data) continue;
+      try {
+        const obj = JSON.parse(data);
+        if (event === "meta") {
+          $("masked").textContent = obj.masked_prompt || "";
+          $("pii").textContent = JSON.stringify(obj.pii_detected || {}, null, 2);
+          $("raw").textContent = JSON.stringify(obj, null, 2);
+        } else if (event === "chunk") {
+          $("response").textContent += obj.text || "";
+        } else if (event === "error") {
+          $("response").textContent += "\n[error] " + (obj.error || "");
+          $("response").classList.add("err");
+        }
+      } catch {}
+    }
+  }
+}
+
+$("send").addEventListener("click", async () => {
+  reset();
+  $("response").classList.remove("err");
+  const prompt = $("prompt").value.trim();
+  if (!prompt) return;
+  const body = {
+    prompt,
+    language: $("language").value,
+    unmask_response: $("unmask").checked,
+  };
+  $("send").disabled = true;
+  try {
+    if ($("stream").checked) await sendStream(body);
+    else await sendNonStream(body);
+  } catch (e) {
+    $("response").textContent = "Error: " + e.message;
+    $("response").classList.add("err");
+  } finally {
+    $("send").disabled = false;
+  }
+});
+
+$("clear").addEventListener("click", () => {
+  $("prompt").value = "";
+  reset();
+});
+
+checkHealth();
+</script>
+</body>
+</html>
