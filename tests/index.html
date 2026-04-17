@@ -2,111 +2,351 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8" />
-<title>AI Gateway Test</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AI Gateway — かんたんデモ</title>
 <style>
   * { box-sizing: border-box; }
   body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    max-width: 960px;
-    margin: 20px auto;
-    padding: 0 16px;
-    color: #222;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+      "Hiragino Kaku Gothic ProN", "Yu Gothic UI", sans-serif;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 24px 16px 80px;
+    color: #1f2937;
+    background: #f9fafb;
+    line-height: 1.6;
   }
-  h1 { font-size: 20px; margin-bottom: 8px; }
-  .row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
-  label { font-size: 13px; color: #555; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .lead { color: #6b7280; font-size: 14px; margin: 0 0 24px; }
+
+  .card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+  }
+  .card h2 {
+    font-size: 15px;
+    margin: 0 0 12px;
+    color: #374151;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card h2 .num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #2563eb;
+    color: #fff;
+    font-size: 13px;
+    font-weight: bold;
+  }
+  .hint { font-size: 12px; color: #6b7280; margin: 0 0 8px; }
+
+  label { display: block; font-size: 13px; color: #4b5563; margin-bottom: 6px; font-weight: 600; }
   textarea {
     width: 100%;
-    min-height: 100px;
     font-size: 14px;
-    padding: 8px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
+    padding: 10px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
     font-family: inherit;
+    line-height: 1.6;
+    resize: vertical;
+    background: #fff;
   }
-  select, input[type=text] {
-    padding: 6px 8px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    font-size: 14px;
+  textarea:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37,99,235,0.15);
   }
+  #reference, #question { min-height: 180px; height: 100%; }
+
+  .input-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .input-grid .card { margin-bottom: 0; display: flex; flex-direction: column; }
+  .input-grid .card textarea { flex: 1; }
+  @media (max-width: 720px) {
+    .input-grid { grid-template-columns: 1fr; }
+  }
+
+  .actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
   button {
-    padding: 8px 16px;
-    font-size: 14px;
+    padding: 10px 20px;
+    font-size: 15px;
+    font-weight: 600;
     background: #2563eb;
     color: white;
     border: none;
-    border-radius: 4px;
+    border-radius: 8px;
     cursor: pointer;
+    transition: background 0.15s;
   }
+  button:hover:not(:disabled) { background: #1d4ed8; }
   button:disabled { background: #9ca3af; cursor: not-allowed; }
   button.secondary { background: #6b7280; }
-  .section {
-    margin-top: 16px;
-    padding: 12px;
-    background: #f8f9fb;
-    border: 1px solid #e5e7eb;
-    border-radius: 6px;
+  button.secondary:hover:not(:disabled) { background: #4b5563; }
+
+  .answer-card {
+    background: linear-gradient(135deg, #eff6ff 0%, #f0fdf4 100%);
+    border: 1px solid #bfdbfe;
   }
-  .section h3 { margin: 0 0 8px; font-size: 13px; color: #374151; }
-  pre {
-    margin: 0;
+  .answer-card h2 { color: #1e40af; font-size: 16px; }
+  .answer-body {
+    font-size: 15px;
     white-space: pre-wrap;
     word-break: break-word;
-    font-family: Consolas, Menlo, monospace;
-    font-size: 13px;
+    color: #111827;
+    min-height: 40px;
   }
-  .response { min-height: 80px; }
-  .status { font-size: 12px; color: #6b7280; }
-  .err { color: #dc2626; }
+
+  .flow-card { background: #fafafa; }
+  .flow-step {
+    border-left: 3px solid #e5e7eb;
+    padding: 4px 0 12px 16px;
+    margin-left: 8px;
+    position: relative;
+  }
+  .flow-step:last-child { padding-bottom: 0; }
+  .flow-step::before {
+    content: "";
+    position: absolute;
+    left: -7px; top: 6px;
+    width: 11px; height: 11px;
+    border-radius: 50%;
+    background: #9ca3af;
+  }
+  .flow-step.s1::before { background: #3b82f6; }
+  .flow-step.s2::before { background: #f59e0b; }
+  .flow-step.s3::before { background: #f59e0b; }
+  .flow-step.s4::before { background: #10b981; }
+
+  .flow-llm {
+    border-left: 3px solid #e5e7eb;
+    padding: 8px 0 12px 16px;
+    margin-left: 8px;
+    position: relative;
+  }
+  .flow-llm::before {
+    content: "";
+    position: absolute;
+    left: -9px; top: 10px;
+    width: 15px; height: 15px;
+    border-radius: 50%;
+    background: #8b5cf6;
+    box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.18);
+  }
+  .flow-llm-box {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+    border: 1px solid #ddd6fe;
+    border-radius: 999px;
+    padding: 8px 16px;
+    font-size: 13px;
+    color: #5b21b6;
+    font-weight: 600;
+  }
+  .flow-llm-box .llm-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: #8b5cf6;
+    color: #fff;
+    font-size: 12px;
+  }
+  .flow-llm-note {
+    font-size: 11px;
+    color: #6b7280;
+    margin-left: 10px;
+    font-weight: normal;
+  }
+
+  .flow-label {
+    font-size: 12px;
+    color: #6b7280;
+    margin-bottom: 4px;
+    font-weight: 600;
+  }
+  .flow-label .tag {
+    display: inline-block;
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    margin-left: 4px;
+    font-weight: 600;
+    vertical-align: middle;
+  }
+  .tag.send { background: #dbeafe; color: #1e40af; }
+  .tag.mask { background: #fef3c7; color: #92400e; }
+  .tag.final { background: #d1fae5; color: #065f46; }
+
+  .flow-body {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-size: 13px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: Consolas, "Yu Gothic UI", monospace;
+    color: #1f2937;
+    max-height: 260px;
+    overflow-y: auto;
+  }
+  .flow-body.empty { color: #9ca3af; font-style: italic; }
+
+  /* PIIプレースホルダーを強調 */
+  .flow-body mark {
+    background: #fef3c7;
+    color: #92400e;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-weight: 600;
+  }
+
+  .status {
+    font-size: 12px;
+    color: #6b7280;
+    text-align: right;
+    margin-bottom: 8px;
+  }
+  .status.err { color: #dc2626; }
+  .status.ok::before { content: "● "; color: #10b981; }
+
+  .loading {
+    display: inline-block;
+    width: 14px; height: 14px;
+    border: 2px solid #bfdbfe;
+    border-top-color: #2563eb;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .err-msg { color: #dc2626; font-size: 13px; }
+
+  details.flow-card { margin-top: 4px; }
+  details.flow-card summary {
+    cursor: pointer;
+    font-size: 15px;
+    color: #374151;
+    font-weight: 600;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  details.flow-card summary::-webkit-details-marker { display: none; }
+  details.flow-card summary::before {
+    content: "▶";
+    font-size: 10px;
+    color: #6b7280;
+    transition: transform 0.15s;
+  }
+  details.flow-card[open] summary::before { transform: rotate(90deg); }
+  details.flow-card summary .hint-inline {
+    font-weight: normal;
+    font-size: 12px;
+    color: #6b7280;
+  }
+  details.flow-card .flow-content { margin-top: 16px; }
 </style>
 </head>
 <body>
-  <h1>AI Gateway - Test Console</h1>
-  <div class="status" id="status">checking health…</div>
+  <h1>AI Gateway — かんたんデモ</h1>
+  <p class="lead">
+    参考情報と質問を入力すると、個人情報を隠したうえで AI が回答します。
+    個人情報（名前・メール・電話番号など）は AI に送られる前に自動でマスクされます。
+  </p>
+  <div id="status" class="status">接続を確認しています…</div>
 
-  <div class="row" style="margin-top: 12px;">
-    <label>Language:</label>
-    <select id="language">
-      <option value="ja" selected>ja</option>
-      <option value="en">en</option>
-    </select>
-    <label><input type="checkbox" id="unmask" checked /> unmask_response</label>
-    <label><input type="checkbox" id="stream" /> stream (SSE)</label>
-  </div>
-
-  <textarea id="prompt" placeholder="例: 田中さんのメールは test@example.com です" rows="12"># 以下の情報を参考にしてください
-田中太郎さんの情報
+  <div class="input-grid">
+    <div class="card">
+      <h2><span class="num">1</span>参考情報を入力</h2>
+      <p class="hint">AI に読んでもらう資料です。氏名・メール・電話番号などが含まれていても安全に扱います。</p>
+      <textarea id="reference" placeholder="例: 田中太郎さんの情報&#10; - メールアドレス: test@example.com&#10; - 電話番号: 080-1234-5678">田中太郎さんの情報
  - メールアドレス1: test1@example.com
  - メールアドレス2: test2@example.com
- - 住所:鳥取県西伯郡南部町123
- - 電話番号:08012345678
- - クレジットカード番号:4242424242424242
+ - 住所: 鳥取県西伯郡南部町123
+ - 電話番号: 08012345678
+ - クレジットカード番号: 4242424242424242</textarea>
+    </div>
 
-# 以下の質問に回答してください
-田中太郎さんのメールアドレス、電話番号、クレジット番号を教えて</textarea>
-
-  <div class="row">
-    <button id="send">送信</button>
-    <button id="clear" class="secondary">クリア</button>
+    <div class="card">
+      <h2><span class="num">2</span>質問を入力</h2>
+      <p class="hint">参考情報をもとに AI に聞きたいことを書いてください。</p>
+      <textarea id="question" placeholder="例: 田中さんの連絡先を教えてください">田中太郎さんのメールアドレスを教えて</textarea>
+    </div>
   </div>
 
-  <div class="section">
-    <h3>Response</h3>
-    <pre id="response" class="response"></pre>
+  <div class="card">
+    <div class="actions">
+      <button id="send">AI に送信する</button>
+      <button id="clear" class="secondary" type="button">クリア</button>
+    </div>
   </div>
-  <div class="section">
-    <h3>Masked prompt</h3>
-    <pre id="masked"></pre>
+
+  <div class="card answer-card">
+    <h2><span class="num">3</span>AI の回答</h2>
+    <div id="answer" class="answer-body">ここに回答が表示されます。</div>
   </div>
-  <div class="section">
-    <h3>PII detected (placeholder → original)</h3>
-    <pre id="pii"></pre>
-  </div>
-  <div class="section">
-    <h3>Raw JSON</h3>
-    <pre id="raw"></pre>
-  </div>
+
+  <details class="card flow-card">
+    <summary>
+      処理の流れを見る
+      <span class="hint-inline">（マスク前後の内容を確認できます）</span>
+    </summary>
+    <div class="flow-content">
+      <div class="flow-step s1">
+        <div class="flow-label">① あなたの質問</div>
+        <div id="flow-original" class="flow-body empty">まだ送信されていません</div>
+      </div>
+      <div class="flow-step s2">
+        <div class="flow-label">
+          ② マスク後の質問
+          <span class="tag send">AI に送信される内容</span>
+        </div>
+        <div id="flow-masked-prompt" class="flow-body empty">まだ送信されていません</div>
+      </div>
+      <div class="flow-llm">
+        <span class="flow-llm-box">
+          <span class="llm-icon">★</span>
+          LLM（Gemini）が回答を生成
+        </span>
+        <span class="flow-llm-note">マスク済みのテキストだけが AI に渡されます</span>
+      </div>
+      <div class="flow-step s3">
+        <div class="flow-label">
+          ③ マスクされた回答
+          <span class="tag mask">AI から返された内容</span>
+        </div>
+        <div id="flow-masked-response" class="flow-body empty">まだ送信されていません</div>
+      </div>
+      <div class="flow-step s4">
+        <div class="flow-label">
+          ④ 最終回答
+          <span class="tag final">マスクを解除して表示</span>
+        </div>
+        <div id="flow-final" class="flow-body empty">まだ送信されていません</div>
+      </div>
+    </div>
+  </details>
 
 <script>
 const $ = (id) => document.getElementById(id);
@@ -115,110 +355,113 @@ async function checkHealth() {
   try {
     const r = await fetch("/health");
     const j = await r.json();
-    $("status").textContent = `health: ${j.status} / redis: ${j.redis}`;
+    if (j.status === "ok") {
+      $("status").textContent = "サーバー接続 OK";
+      $("status").classList.add("ok");
+    } else {
+      $("status").textContent = "サーバー応答: " + j.status;
+    }
   } catch (e) {
-    $("status").textContent = "health check failed: " + e.message;
+    $("status").textContent = "サーバーに接続できません";
     $("status").classList.add("err");
   }
 }
 
-function reset() {
-  $("response").textContent = "";
-  $("masked").textContent = "";
-  $("pii").textContent = "";
-  $("raw").textContent = "";
+function buildPrompt(reference, question) {
+  const ref = reference.trim();
+  const q = question.trim();
+  if (ref && q) {
+    return `# 以下の情報を参考にしてください\n${ref}\n\n# 以下の質問に回答してください\n${q}`;
+  }
+  return q || ref;
 }
 
-async function sendNonStream(body) {
-  const res = await fetch("/gateway/generate", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  const json = await res.json();
-  if (!res.ok) {
-    $("response").textContent = "Error: " + (json.detail || res.statusText);
-    $("response").classList.add("err");
-    $("raw").textContent = JSON.stringify(json, null, 2);
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+// <PERSON_1> や <EMAIL_ADDRESS_2> のようなプレースホルダーを強調表示
+function highlightPlaceholders(text) {
+  const escaped = escapeHtml(text);
+  return escaped.replace(/&lt;[A-Z_]+(?:_\d+)?&gt;/g, (m) => `<mark>${m}</mark>`);
+}
+
+function setFlow(id, text, { highlight = false } = {}) {
+  const el = $(id);
+  if (!text) {
+    el.textContent = "（該当なし）";
+    el.classList.add("empty");
     return;
   }
-  $("response").textContent = json.llm_response || "";
-  $("masked").textContent = json.masked_prompt || "";
-  $("pii").textContent = JSON.stringify(json.pii_detected || {}, null, 2);
-  $("raw").textContent = JSON.stringify(json, null, 2);
+  el.classList.remove("empty");
+  if (highlight) {
+    el.innerHTML = highlightPlaceholders(text);
+  } else {
+    el.textContent = text;
+  }
 }
 
-async function sendStream(body) {
-  const res = await fetch("/gateway/stream", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+function resetOutputs() {
+  $("answer").textContent = "ここに回答が表示されます。";
+  ["flow-original", "flow-masked-prompt", "flow-masked-response", "flow-final"].forEach((id) => {
+    $(id).textContent = "まだ送信されていません";
+    $(id).classList.add("empty");
   });
-  if (!res.ok || !res.body) {
-    $("response").textContent = "Stream error: " + res.statusText;
-    $("response").classList.add("err");
+}
+
+async function send() {
+  const reference = $("reference").value;
+  const question = $("question").value;
+  const prompt = buildPrompt(reference, question);
+  if (!prompt.trim()) {
+    $("answer").innerHTML = '<span class="err-msg">参考情報または質問を入力してください。</span>';
     return;
   }
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buf = "";
-  $("response").textContent = "";
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buf += decoder.decode(value, { stream: true });
-    const parts = buf.split("\n\n");
-    buf = parts.pop();
-    for (const part of parts) {
-      const lines = part.split("\n");
-      let event = "message", data = "";
-      for (const line of lines) {
-        if (line.startsWith("event:")) event = line.slice(6).trim();
-        else if (line.startsWith("data:")) data += line.slice(5).trim();
-      }
-      if (!data) continue;
-      try {
-        const obj = JSON.parse(data);
-        if (event === "meta") {
-          $("masked").textContent = obj.masked_prompt || "";
-          $("pii").textContent = JSON.stringify(obj.pii_detected || {}, null, 2);
-          $("raw").textContent = JSON.stringify(obj, null, 2);
-        } else if (event === "chunk") {
-          $("response").textContent += obj.text || "";
-        } else if (event === "error") {
-          $("response").textContent += "\n[error] " + (obj.error || "");
-          $("response").classList.add("err");
-        }
-      } catch {}
-    }
-  }
-}
 
-$("send").addEventListener("click", async () => {
-  reset();
-  $("response").classList.remove("err");
-  const prompt = $("prompt").value.trim();
-  if (!prompt) return;
-  const body = {
-    prompt,
-    language: $("language").value,
-    unmask_response: $("unmask").checked,
-  };
   $("send").disabled = true;
+  $("answer").innerHTML = '<span class="loading"></span>AI が考えています…';
+
   try {
-    if ($("stream").checked) await sendStream(body);
-    else await sendNonStream(body);
+    const res = await fetch("/gateway/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt,
+        language: "ja",
+        unmask_response: true,
+      }),
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      $("answer").innerHTML = '<span class="err-msg">エラー: ' +
+        escapeHtml(json.detail || res.statusText) + '</span>';
+      return;
+    }
+
+    $("answer").textContent = json.llm_response || "（回答がありませんでした）";
+
+    setFlow("flow-original", json.original_prompt || prompt);
+    setFlow("flow-masked-prompt", json.masked_prompt, { highlight: true });
+    setFlow("flow-masked-response", json.llm_response_raw, { highlight: true });
+    setFlow("flow-final", json.llm_response);
   } catch (e) {
-    $("response").textContent = "Error: " + e.message;
-    $("response").classList.add("err");
+    $("answer").innerHTML = '<span class="err-msg">通信エラー: ' + escapeHtml(e.message) + '</span>';
   } finally {
     $("send").disabled = false;
   }
-});
+}
 
+$("send").addEventListener("click", send);
 $("clear").addEventListener("click", () => {
-  $("prompt").value = "";
-  reset();
+  $("reference").value = "";
+  $("question").value = "";
+  resetOutputs();
+  $("reference").focus();
 });
 
 checkHealth();
